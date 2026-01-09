@@ -1,0 +1,14 @@
+# build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY ../frontend/package*.json ./
+RUN npm install
+COPY ../frontend/ .
+RUN npm run build
+
+# production stage
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/.output ./
+EXPOSE 3000
+CMD ["node", "server/index.mjs"]

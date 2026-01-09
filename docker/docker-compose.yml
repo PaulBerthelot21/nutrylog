@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: nutrylog
+      POSTGRES_PASSWORD: nutrylog
+      POSTGRES_DB: nutrylog
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile-backend
+    environment:
+      DATABASE_URL: postgres://nutrylog:nutrylog@postgres:5432/nutrylog
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile-frontend
+    ports:
+      - "4000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
