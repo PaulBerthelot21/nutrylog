@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Meal } from './entities/meal.entity';
@@ -18,31 +18,33 @@ export class MealsService {
     private readonly foodsService: FoodsService,
   ) {}
 
-  async create(createMealDto: CreateMealDto): Promise<Meal> {
+  async create(createMealDto: CreateMealDto, userId: string): Promise<Meal> {
     const meal = this.mealRepository.create({
       type: createMealDto.type,
       date: new Date(createMealDto.date),
       notes: createMealDto.notes,
+      userId,
     });
 
     const savedMeal = await this.mealRepository.save(meal);
 
     if (createMealDto.items?.length) {
       for (const item of createMealDto.items) {
-        await this.addItem(savedMeal.id, item);
+        await this.addItem(savedMeal.id, item, userId);
       }
     }
 
-    return this.findOne(savedMeal.id);
+    return this.findOne(savedMeal.id, userId);
   }
 
-  async findAll(): Promise<Meal[]> {
+  async findAll(userId: string): Promise<Meal[]> {
     return this.mealRepository.find({
+      where: { userId },
       order: { date: 'DESC', createdAt: 'DESC' },
     });
   }
 
-  async findByDate(date: string): Promise<Meal[]> {
+  async findByDate(date: string, userId: string): Promise<Meal[]> {
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(date);
@@ -50,50 +52,56 @@ export class MealsService {
 
     return this.mealRepository.find({
       where: {
+        userId,
         date: Between(startDate, endDate),
       },
       order: { createdAt: 'ASC' },
     });
   }
 
-  async findByDateRange(startDate: string, endDate: string): Promise<Meal[]> {
+  async findByDateRange(startDate: string, endDate: string, userId: string): Promise<Meal[]> {
     return this.mealRepository.find({
       where: {
+        userId,
         date: Between(new Date(startDate), new Date(endDate)),
       },
       order: { date: 'ASC', createdAt: 'ASC' },
     });
   }
 
-  async findOne(id: string): Promise<Meal> {
+  async findOne(id: string, userId?: string): Promise<Meal> {
     const meal = await this.mealRepository.findOne({
       where: { id },
       relations: ['items', 'items.food'],
     });
     if (!meal) {
-      throw new NotFoundException(`Meal with ID ${id} not found`);
+      throw new NotFoundException(`Repas avec l'ID ${id} non trouvé`);
+    }
+    // Vérifier que le repas appartient à l'utilisateur
+    if (userId && meal.userId && meal.userId !== userId) {
+      throw new ForbiddenException('Vous n\'avez pas accès à ce repas');
     }
     return meal;
   }
 
-  async update(id: string, updateMealDto: UpdateMealDto): Promise<Meal> {
-    const meal = await this.findOne(id);
+  async update(id: string, updateMealDto: UpdateMealDto, userId: string): Promise<Meal> {
+    const meal = await this.findOne(id, userId);
 
     if (updateMealDto.type) meal.type = updateMealDto.type;
     if (updateMealDto.date) meal.date = new Date(updateMealDto.date);
     if (updateMealDto.notes !== undefined) meal.notes = updateMealDto.notes;
 
     await this.mealRepository.save(meal);
-    return this.findOne(id);
+    return this.findOne(id, userId);
   }
 
-  async remove(id: string): Promise<void> {
-    const meal = await this.findOne(id);
+  async remove(id: string, userId: string): Promise<void> {
+    const meal = await this.findOne(id, userId);
     await this.mealRepository.remove(meal);
   }
 
-  async addItem(mealId: string, addItemDto: AddItemDto | CreateMealItemDto): Promise<Meal> {
-    const meal = await this.findOne(mealId);
+  async addItem(mealId: string, addItemDto: AddItemDto | CreateMealItemDto, userId: string): Promise<Meal> {
+    const meal = await this.findOne(mealId, userId);
     const food = await this.foodsService.findOne(addItemDto.foodId);
 
     // Calcul des valeurs nutritionnelles proportionnelles
@@ -110,26 +118,26 @@ export class MealsService {
     });
 
     await this.mealItemRepository.save(mealItem);
-    return this.findOne(mealId);
+    return this.findOne(mealId, userId);
   }
 
-  async removeItem(mealId: string, itemId: string): Promise<Meal> {
-    await this.findOne(mealId);
+  async removeItem(mealId: string, itemId: string, userId: string): Promise<Meal> {
+    await this.findOne(mealId, userId);
 
     const item = await this.mealItemRepository.findOne({
       where: { id: itemId, mealId },
     });
 
     if (!item) {
-      throw new NotFoundException(`Item with ID ${itemId} not found in meal ${mealId}`);
+      throw new NotFoundException(`Item avec l'ID ${itemId} non trouvé dans le repas ${mealId}`);
     }
 
     await this.mealItemRepository.remove(item);
-    return this.findOne(mealId);
+    return this.findOne(mealId, userId);
   }
 
-  async getDailySummary(date: string) {
-    const meals = await this.findByDate(date);
+  async getDailySummary(date: string, userId: string) {
+    const meals = await this.findByDate(date, userId);
 
     const totals = meals.reduce(
       (acc, meal) => {
