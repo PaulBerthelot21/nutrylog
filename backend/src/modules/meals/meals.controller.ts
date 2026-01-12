@@ -87,4 +87,14 @@ export class MealsController {
   ) {
     return this.mealsService.removeItem(id, itemId, req.user.id);
   }
+
+  @Patch(':id/items/:itemId')
+  updateItem(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Body('quantity') quantity: number,
+    @Request() req,
+  ) {
+    return this.mealsService.updateItem(id, itemId, quantity, req.user.id);
+  }
 }

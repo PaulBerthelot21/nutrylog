@@ -136,6 +136,30 @@ export class MealsService {
     return this.findOne(mealId, userId);
   }
 
+  async updateItem(mealId: string, itemId: string, quantity: number, userId: string): Promise<Meal> {
+    await this.findOne(mealId, userId);
+
+    const item = await this.mealItemRepository.findOne({
+      where: { id: itemId, mealId },
+      relations: ['food'],
+    });
+
+    if (!item) {
+      throw new NotFoundException(`Item avec l'ID ${itemId} non trouvé dans le repas ${mealId}`);
+    }
+
+    // Recalculer les valeurs nutritionnelles
+    const ratio = quantity / Number(item.food.servingSize);
+    item.quantity = quantity;
+    item.calories = Number(item.food.calories) * ratio;
+    item.proteins = Number(item.food.proteins) * ratio;
+    item.carbs = Number(item.food.carbs) * ratio;
+    item.fats = Number(item.food.fats) * ratio;
+
+    await this.mealItemRepository.save(item);
+    return this.findOne(mealId, userId);
+  }
+
   async getDailySummary(date: string, userId: string) {
     const meals = await this.findByDate(date, userId);
 

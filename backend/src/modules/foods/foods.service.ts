@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, IsNull } from 'typeorm';
+import { Repository, ILike, IsNull } from 'typeorm';
 import { Food } from './entities/food.entity';
 import { CreateFoodDto } from './dto/create-food.dto';
 import { UpdateFoodDto } from './dto/update-food.dto';
@@ -50,12 +50,22 @@ export class FoodsService {
 
   async findAll(search?: string): Promise<Food[]> {
     if (search) {
-      return this.foodRepository.find({
+      const results = await this.foodRepository.find({
         where: [
-          { name: Like(`%${search}%`) },
-          { brand: Like(`%${search}%`) },
+          { name: ILike(`%${search}%`) },
+          { brand: ILike(`%${search}%`) },
         ],
-        order: { name: 'ASC' },
+      });
+      
+      // Trier: d'abord ceux qui commencent par le terme, puis alphabétiquement
+      const searchLower = search.toLowerCase();
+      return results.sort((a, b) => {
+        const aStartsWith = a.name.toLowerCase().startsWith(searchLower);
+        const bStartsWith = b.name.toLowerCase().startsWith(searchLower);
+        
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+        return a.name.localeCompare(b.name, 'fr');
       });
     }
     return this.foodRepository.find({ order: { name: 'ASC' } });
