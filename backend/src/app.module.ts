@@ -5,6 +5,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FoodsModule } from './modules/foods/foods.module';
 import { MealsModule } from './modules/meals/meals.module';
+import { UsersModule } from './modules/users/users.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { MealsModule } from './modules/meals/meals.module';
         synchronize: configService.get('NODE_ENV') === 'development',
       }),
     }),
+    UsersModule,
+    AuthModule,
     FoodsModule,
     MealsModule,
   ],

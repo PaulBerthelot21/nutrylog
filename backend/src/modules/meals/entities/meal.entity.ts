@@ -5,8 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { MealItem } from './meal-item.entity';
+import { User } from '../../users/entities/user.entity';
 
 export enum MealType {
   BREAKFAST = 'breakfast',
@@ -19,6 +22,13 @@ export enum MealType {
 export class Meal {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @ManyToOne(() => User, (user) => user.meals, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @Column({ name: 'user_id', nullable: true })
+  userId: string;
 
   @Column({
     type: 'enum',
